@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Acceso a Cámara y Ubicación</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #videoContainer, #map {
+            width: 100%;
+            height: 300px;
+        }
+        #video {
+            width: 100%;
+            height: 100%;
+            background: black;
+        }
+        #controls {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        #toggleCamera {
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            background: url('./images/change_camera.png') no-repeat center center;
+            background-size: cover;
+        }
+        #logo {
+            width: 200px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="videoContainer">
+        <video id="video" autoplay playsinline></video>
+    </div>
+    <div id="controls">
+        <button id="toggleCamera" onclick="toggleCamera()"></button>
+    </div>
+    <div id="map"></div>
+    <img src="./images/logo_municipal.png" alt="Logo Municipal" id="logo">
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        var map, marker;
+        var currentFacingMode = 'environment';
+        var peerConnection = new RTCPeerConnection({
+            iceServers: [{urls: 'stun:stun.l.google.com:19302'}]
+        });
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: {lat: -34.397, lng: 150.644},
+                zoom: 8
+            });
+            marker = new google.maps.Marker({
+                position: {lat: -34.397, lng: 150.644},
+                map: map,
+                title: 'Ubicación del Usuario'
+            });
+            console.log('Map initialized.');
+        }
+
+        function loadGoogleMaps() {
+            var script = document.createElement('script');
+            script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyCYf7lrGH699r7K-qzDbtEQEgOIeR8cK4Y&callback=initMap';
+            script.async = true;
+            script.defer = true;
+            document.body.appendChild(script);
+        }
+
+        function toggleCamera() {
+            currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+            requestPermissions();
+            console.log('Toggling camera to:', currentFacingMode);
+        }
+
+        function requestPermissions() {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } })
+            .then(stream => {
+                document.getElementById('video').srcObject = stream;
+                stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+                console.log('Camera and microphone permissions granted.');
+            })
+            .catch(error => {
+                console.error('Error accessing the camera and microphone:', error);
+            });
+
+            navigator.geolocation.getCurrentPosition(position => {
+                updateLocation(position.coords.latitude, position.coords.longitude);
+                console.log('Geolocation permissions granted.');
+            }, error => {
+                console.error('Error accessing the geolocation:', error);
+            });
+        }
+
+        function updateLocation(latitude, longitude) {
+            var newPos = {lat: latitude, lng: longitude};
+            map.setCenter(newPos);
+            marker.setPosition(newPos);
+            console.log('Location updated on map.');
+        }
+
+        window.onload = function() {
+            loadGoogleMaps();  // Load Google Maps after the page has loaded.
+            requestPermissions();
+        };
+    </script>
+</body>
+</html>
