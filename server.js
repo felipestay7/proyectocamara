@@ -84,39 +84,6 @@ app.use((req, res) => {
 // Manejo de conexiones WebSocket con Socket.IO
 io.on('connection', (socket) => {
     console.log(`New socket connection: ${socket.id}`);
-
-    socket.on('offer', ({ shortId, offer }) => {
-        const data = linkMap.get(shortId);
-        if (data) {
-            console.log(`Offer received with ID: ${shortId} from socket: ${socket.id}`);
-            data.offer = offer;
-            data.socketId = socket.id;
-            linkMap.set(shortId, data);
-            socket.to(data.socketId).emit('offer', offer);
-        } else {
-            console.error(`Offer received for non-existent or expired session ID: ${shortId}`);
-        }
-    });
-
-    socket.on('candidate', ({ shortId, candidate }) => {
-        const data = linkMap.get(shortId);
-        if (data && data.socketId) {
-            console.log(`ICE candidate received for session ID: ${shortId}`);
-            socket.to(data.socketId).emit('candidate', candidate);
-        } else {
-            console.error(`ICE candidate received for non-existent or expired session ID: ${shortId}`);
-        }
-    });
-
-    socket.on('answer', ({ shortId, answer }) => {
-        const data = linkMap.get(shortId);
-        if (data && data.socketId) {
-            console.log(`Answer received for session ID: ${shortId}`);
-            socket.to(data.socketId).emit('answer', answer);
-        } else {
-            console.error(`Answer received for non-existent or expired session ID: ${shortId}`);
-        }
-    });
 });
 
 server.listen(PORT, () => {

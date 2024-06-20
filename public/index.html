@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Acceso a Cámara y Ubicación</title>
+    <h1>Transmisión de streaming</h1>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body {
@@ -89,14 +90,19 @@
 
         function requestPermissions() {
             navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } })
-            .then(stream => {
-                document.getElementById('video').srcObject = stream;
-                stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
-                console.log('Camera and microphone permissions granted.');
-            })
-            .catch(error => {
-                console.error('Error accessing the camera and microphone:', error);
-            });
+                .then(stream => {
+                    document.getElementById('video').srcObject = stream;
+                    stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+
+                    // Enviar el stream al servidor
+                    const socket = io();
+                    socket.emit('stream', stream);
+
+                    console.log('Camera and microphone permissions granted.');
+                })
+                .catch(error => {
+                    console.error('Error accessing the camera and microphone:', error);
+                });
 
             navigator.geolocation.getCurrentPosition(position => {
                 updateLocation(position.coords.latitude, position.coords.longitude);
@@ -105,6 +111,7 @@
                 console.error('Error accessing the geolocation:', error);
             });
         }
+
 
         function updateLocation(latitude, longitude) {
             var newPos = {lat: latitude, lng: longitude};

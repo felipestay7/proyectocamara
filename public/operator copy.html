@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generador de Enlaces de Emergencia</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            text-align: center;
+        }
+        #linkContainer, #logoContainer, #videoContainer {
+            margin-top: 20px;
+            text-align: center;
+        }
+        #remoteVideo {
+            width: 640px;
+            height: 480px;
+            background: black;
+            margin: auto;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            color: white;
+            margin: 5px;
+            background-color: #04AA6D;
+        }
+        #terminateLink {
+            background-color: #ff6347;
+        }
+        #copyLink {
+            background-color: #008CBA;
+        }
+        #forceConnection {
+            background: url('./images/live.png') no-repeat center;
+            background-size: contain;
+            height: 50px;
+            width: 50px;
+        }
+        #logoContainer img {
+            width: 150px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Generador de Enlaces de Emergencia</h1>
+    <button id="generateLink">Generar Enlace</button>
+    <button id="copyLink">Copiar Enlace</button>
+    <button id="terminateLink">Terminar Emergencia</button>
+    <button id="forceConnection" onclick="forceConnection()"></button>
+    <div id="linkContainer">
+        <p>Enlace generado:</p>
+        <input type="text" id="generatedLink" readonly>
+    </div>
+    <div id="videoContainer">
+        <video id="remoteVideo" autoplay playsinline></video>
+    </div>
+    <div id="logoContainer">
+        <img src="images/logo_municipal.png">
+        <img src="images/camioneta_seg_publi.png">
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let peerConnection = new RTCPeerConnection({
+            iceServers: [{urls: 'stun:stun.l.google.com:19302'}]
+        });
+
+        // Monitoring ICE connection state and signaling state changes
+        peerConnection.oniceconnectionstatechange = () => {
+            console.log('ICE Connection State Change:', peerConnection.iceConnectionState);
+        };
+        peerConnection.onsignalingstatechange = () => {
+            console.log('Signaling State Change:', peerConnection.signalingState);
+        };
+
+        peerConnection.ontrack = event => {
+            console.log('Tracks received:', event.streams);
+            document.getElementById('remoteVideo').srcObject = event.streams[0];
+        };
+
+        function forceConnection() {
+            console.log('Attempting to force reconnection...');
+            if (peerConnection.signalingState !== 'stable') {
+                console.log('Connection unstable, forcing reconnection...');
+                const shortId = new URL(document.getElementById('generatedLink').value).searchParams.get('shortId');
+                socket.emit('force-reconnect', { shortId });
+            } else {
+                console.log('Connection already stable.');
+            }
+        }
+
+        document.getElementById('generateLink').addEventListener('click', () => {
+            console.log('Generating link...');
+            fetch('/generate-link')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Link generated:', data.link);
+                    document.getElementById('generatedLink').value = data.link;
+                    document.getElementById('linkContainer').style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Error generating link:', error);
+                    alert('Error al generar enlace: ' + error);
+                });
+        });
+
+        document.getElementById('copyLink').addEventListener('click', () => {
+            const input = document.getElementById('generated18Link');
+            input.select();
+            document.execCommand('copy');
+            console.log('Link copied to clipboard.');
+            alert('Enlace copiado al portapapeles.');
+        });
+
+        document.getElementById('terminateLink').addEventListener('click', () => {
+            const shortId = new URL(document.getElementById('generatedLink').value).searchParams.get('shortId');
+            console.log('Terminating link for shortId:', shortId);
+            fetch('/terminate-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ shortId })
+            })
+            .then(() => {
+                console.log('Link termination successful.');
+                alert('Enlace terminado.');
+                document.getElementById('linkContainer').style.display = 'none';
+                document.getElementById('remoteVideo').srcObject = null;
+                peerConnection.close();
+                peerConnection = null;
+            })
+            .catch(error => {
+                console.error('Error terminating link:', error);
+                alert('Error al terminar el enlace: ' + error);
+            });
+        });
+
+        socket.on('answer', answer => {
+            console.log('Answer received:', answer);
+            peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+        });
+
+        socket.on('candidate', candidate => {
+            console.log('ICE candidate received:', candidate);
+            peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        });
+    </script>
+</body>
+</html>
